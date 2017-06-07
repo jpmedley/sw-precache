@@ -48,5 +48,8 @@
   },
   "scripts": {
     "start": "node index.js"
+  },
+  "devDependencies": {
+    "workbox-build": "^1.0.1"
   }
 }

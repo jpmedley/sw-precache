@@ -32,6 +32,7 @@ import source from 'vinyl-source-stream';
 import {spawn} from 'child_process';
 import swPrecache from 'sw-precache';
 import uglify from 'gulp-uglify';
+import wbBuild from 'workbox-build';
 
 const SRC_DIR = 'src';
 const BUILD_DIR = 'build';
@@ -112,6 +113,71 @@ gulp.task('version-assets', () => {
 });
 
 gulp.task('generate-service-worker', () => {
+  let serviceWorkerFile = path.join(BUILD_DIR, 'service-worker.js');
+
+  return wbBuild.generateSW({
+    // Start of interesting bits.
+
+    // Ensure all our static, local assets are cached.
+    swDest: '${BUILD_DIR}',
+    globDirectory: '${BUILD_DIR}',
+    globPatterns: [
+      `rev/js/**/*.js`,
+      `rev/styles/all*.css`,
+      `images/**/*`
+    ],
+
+    // Define the dependencies for the server-rendered/shell URL,
+    // so that it's kept up to date.
+    templateUrls: {
+      '/shell': [
+        ...glob.sync(`${BUILD_DIR}/rev/js/**/*.js`),
+        ...glob.sync(`${BUILD_DIR}/rev/styles/all*.css`),
+        `${SRC_DIR}/views/index.handlebars`
+      ]
+    },
+
+    // Brute force service worker routing:
+    // Tell the service worker to use /shell for all navigations.
+    // E.g. a request for /guides/12345 will be fulfilled with /shell.
+    navigateFallback: '/shell',
+
+    // Various runtime caching strategies.
+    runtimeCaching: [{
+      urlPattern: /www\.ifixit\.com\/api\/2\.0\//,
+      handler: 'StaleWhileRevalidate'
+    }, {
+      urlPattern: /cloudfront\.net/,
+      handler: 'CacheFirst',
+      options: {
+        cache: {
+          name: 'image-cache',
+          // Use sw-toolbox's LRU expiration.
+          maxEntries: 50
+        }
+      }
+    }, {
+      // Use a network first strategy for everything else.
+      default: 'NetworkFirst'
+    }],
+
+    // End of interesting bits.
+
+    cacheId: packageJson.name,
+    dontCacheBustUrlsMatching: /./,
+    logger: gutil.log,
+    stripPrefix: 'build/',
+    verbose: true
+  })
+  .then(() => {
+    console.log('Service worker generated.');
+  })
+  .catch((err) => {
+    console.log('[ERROR] This happened: ' + err);
+  })
+})
+
+gulp.task('_generate-service-worker', () => {
   let serviceWorkerFile = path.join(BUILD_DIR, 'service-worker.js');
 
   return swPrecache.write(serviceWorkerFile, {
