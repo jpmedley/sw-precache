@@ -119,8 +119,8 @@ gulp.task('generate-service-worker', () => {
     // Start of interesting bits.
 
     // Ensure all our static, local assets are cached.
-    swDest: '${BUILD_DIR}',
-    globDirectory: '${BUILD_DIR}',
+    swDest: BUILD_DIR,
+    globDirectory: BUILD_DIR,
     globPatterns: [
       `rev/js/**/*.js`,
       `rev/styles/all*.css`,
